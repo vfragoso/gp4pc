@@ -21,6 +21,16 @@ namespace msft {
 // TODO(vfragoso): Document class!
 class Gp4pc {
 public:
+  // TODO(vfragoso): Document me!
+  struct Params {
+    // Coplanar threshold.
+    const double coplanar_threshold = 1e-3;
+    // Colinear threshold.
+    const double colinear_threshold = 1e-2;
+    // Whether to always use the general solver.
+    const bool use_general_solver = false;
+  };
+
   // This structure aims to collect the input for gp4pc. The input mainly aims
   // to encode the 2D-3D correspondences and the input includes:
   //   1. Ray origins (camera positions).
@@ -40,10 +50,13 @@ public:
     std::vector<Eigen::Quaterniond> rotations;
     std::vector<Eigen::Vector3d> translations;
     std::vector<double> scales;
+    std::vector<Eigen::Vector4d> depths;
   };
 
+  // Constructor.
+  explicit Gp4pc(const Params& params);
   // Default constructor and destructor.
-  Gp4pc() = default;
+  Gp4pc() : Gp4pc(Params()) {}
   ~Gp4pc() = default;
 
   // Estimates the similarity transformations from the given 2D-3D
@@ -53,6 +66,17 @@ public:
   //   input  The 2D-3D correspondences and priors.
   //   solution  The structure holding all the solutions found.
   bool EstimateSimilarityTransformation(const Input& input, Solution* solution);
+
+ private:
+  // Parameters.
+  const Params params_;
+
+  std::vector<Eigen::Vector4d> SolveForPoseViaPlanarSolver(const Input& input);
+
+  std::vector<Eigen::Vector4d> SolveForPoseViaGeneralSolver(const Input& input);
+
+  std::vector<Eigen::Vector4d>
+  KeepPlausibleSolutions(const Eigen::MatrixXcd& solutions);
 };
 
 }  // namespace msft

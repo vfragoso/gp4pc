@@ -120,7 +120,9 @@ set(GP4PC_SRC
   src/gp4pc/gp4pc.cc
   src/gp4pc/gp4pc_robust_estimator.cc
   src/gp4pc/pinhole_camera.cc
-  src/gp4pc/util.cc)
+  src/gp4pc/util.cc
+  src/math/solve_gp4pc_polynomial.cc
+  src/third_party/align_point_clouds.cc)
 
 # Compile gdls* library.
 add_library(gp4pc STATIC ${GP4PC_SRC})
@@ -144,5 +146,6 @@ if (BUILD_TESTING)
   test(src/gp4pc/estimate_similarity_transformation)
   # test(src/gp4pc/gp4pc)
   test(src/gp4pc/pinhole_camera)
+  test(src/math/solve_gp4pc_polynomial)
 
 endif(BUILD_TESTING)
