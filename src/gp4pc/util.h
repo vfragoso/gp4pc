@@ -12,9 +12,9 @@
 #ifndef GP4PC_UTIL_H_
 #define GP4PC_UTIL_H_
 
-#include <vector>
 #include <gp4pc/camera_feature_correspondence_2d_3d.h>
 #include <gp4pc/gp4pc.h>
+#include <vector>
 
 namespace msft {
 

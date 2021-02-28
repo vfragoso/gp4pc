@@ -25,6 +25,12 @@ constexpr double DegToRad(double angle_degrees) noexcept {
   return angle_degrees * kDegToRad;
 }
 
+// Convert radiants to degrees.
+constexpr double RadToDeg(const double angle_radians) noexcept {
+  constexpr double kRadToDeg = 180.0 / M_PI;
+  return angle_radians * kRadToDeg;
+}
+
 }  // namespace msft
 
 #endif  // GP4PC_MATH_UTILS_H_

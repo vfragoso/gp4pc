@@ -11,10 +11,10 @@
 
 #include <gp4pc/util.h>
 
-#include <vector>
 #include <Eigen/Core>
 #include <gp4pc/camera_feature_correspondence_2d_3d.h>
 #include <gp4pc/gp4pc.h>
+#include <vector>
 
 namespace msft {
 

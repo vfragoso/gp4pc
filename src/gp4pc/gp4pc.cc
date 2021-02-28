@@ -651,8 +651,10 @@ bool Gp4pc::EstimateSimilarityTransformation(const Input& input,
   // Check whether the input is planar.
   bool is_planar = false;
   const bool use_planar_solver = !params_.use_general_solver;
-  if (IsInputDegenerateOrPlanar(
-          input, params_.coplanar_threshold, params_.colinear_threshold, &is_planar)) {
+  if (IsInputDegenerateOrPlanar(input,
+                                params_.coplanar_threshold,
+                                params_.colinear_threshold,
+                                &is_planar)) {
     VLOG(4) << "Degenerate case. Could not compute pose.";
     return false;
   } else if (use_planar_solver && is_planar) {

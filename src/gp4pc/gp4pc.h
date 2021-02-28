@@ -12,9 +12,9 @@
 #ifndef GP4PC_GP4PC_H_
 #define GP4PC_GP4PC_H_
 
-#include <vector>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <vector>
 
 namespace msft {
 
@@ -24,11 +24,12 @@ public:
   // TODO(vfragoso): Document me!
   struct Params {
     // Coplanar threshold.
-    const double coplanar_threshold = 1e-3;
+    double coplanar_threshold = 1e-3;
     // Colinear threshold.
-    const double colinear_threshold = 1e-2;
-    // Whether to always use the general solver.
-    const bool use_general_solver = false;
+    double colinear_threshold = 1e-2;
+    // Whether to always use the general solver, or a hybrid (planar + genera)
+    // otherwise.
+    bool use_general_solver = false;
   };
 
   // This structure aims to collect the input for gp4pc. The input mainly aims

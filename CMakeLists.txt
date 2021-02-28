@@ -144,7 +144,7 @@ if (BUILD_TESTING)
   endmacro (TEST)
 
   test(src/gp4pc/estimate_similarity_transformation)
-  # test(src/gp4pc/gp4pc)
+  test(src/gp4pc/gp4pc)
   test(src/gp4pc/pinhole_camera)
   test(src/math/solve_gp4pc_polynomial)
 
