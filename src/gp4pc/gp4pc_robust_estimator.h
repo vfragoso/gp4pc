@@ -61,7 +61,7 @@ class Gp4pcRobustEstimator {
   explicit Gp4pcRobustEstimator(const RansacParameters& params);
   ~Gp4pcRobustEstimator() = default;
 
-  // Estimates the similarity transformation using gDLS* as a minimal solver.
+  // Estimates the similarity transformation using gp4pc as a minimal solver.
   Gp4pc::Solution Estimate(
       const std::vector<CameraFeatureCorrespondence2D3D>& correspondences,
       RansacSummary* ransac_summary);

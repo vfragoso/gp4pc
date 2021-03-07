@@ -582,7 +582,7 @@ Gp4pc::KeepPlausibleSolutions(const Eigen::MatrixXcd& solutions) {
     max_imag_entry = std::max(max_imag_entry, std::abs(solutions(2, i).imag()));
     max_imag_entry = std::max(max_imag_entry, std::abs(solutions(3, i).imag()));
     // TODO(vfragoso): Threshold solutions with large imaginary parts. Set a
-    // a good threshold for getting good solutions with stmall imaginary parts.
+    // a good threshold for getting good solutions with small imaginary parts.
     const bool real_solution = (max_imag_entry <= kRealNumberThreshold);
     VLOG(4) << "Max imag entry: " << max_imag_entry
             << " => real_solution: " << real_solution;

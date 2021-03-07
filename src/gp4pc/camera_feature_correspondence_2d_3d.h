@@ -19,7 +19,7 @@ namespace msft {
 
 // The goal of this structure is to hold the 2D-3D correspondence as well as
 // the individual camera observing the 3D point. This is necessary to build
-// the input to gDLS* as it uses a generalized camera model.
+// the input to gp4pc as it uses a generalized camera model.
 struct CameraFeatureCorrespondence2D3D {
   // The pinhole camera seeing 2D feature. The camera pose must be wrt to the
   // generalized camera coordinate system (or query coordinate system).

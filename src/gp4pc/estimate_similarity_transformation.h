@@ -21,9 +21,8 @@ namespace msft {
 
 // Computes the similarity transformation given 2D-3D correspondences.
 // The 2D-3D correspondences contains also the camera that observes the
-// projection of the candidate 3D point. This function calls the gDLS*
-// directly. Thus, this function can use the gDLS* estimator as minimal
-// or non-minimal solver.
+// projection of the candidate 3D point. This function calls the gp4pc
+// directly.
 //
 // Params:
 //   correspondences  The 2D-3D correspondences.

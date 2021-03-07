@@ -18,18 +18,35 @@
 
 namespace msft {
 
-// TODO(vfragoso): Document class! NOTE: Solution obbeys the Umeyama's
-// similarity transformation application.
+// This class implements a minimal solver for the generalized pose-and-scale
+// problem descrobed in
+//
+// Victor Fragoso and Sudipta Sinha.
+// In Proc. of the IEEE International Conf. on 3D Vision (3DV) 2020.
+//
+// The main idea is to exploit 4-point congruence constraints that can be
+// obtained from ratios relating the lengths of a tethrahedron formed by the
+// 2D-3D correspondences. These constraints help us formulate a problem that
+// depends only on the depths (distance between center of projection and the
+// 3D point). Thus, GP4PC solves first for the depths, and the solves a 3D-3D
+// alignment problem via Umeyama's method.
+//
+// We use the Umeyama's method implemented in Theia. This method assumes the
+// following relationship:
+//
+//   camera_center + depth * ray = scale * rotation * point + translation.
 class Gp4pc {
  public:
-  // TODO(vfragoso): Document me!
+  // Parameters determining behavior of the planar solver and whether to use
+  // only the general solver or hybrad version.
   struct Params {
     // Coplanar threshold.
     double coplanar_threshold = 1e-3;
     // Colinear threshold.
     double colinear_threshold = 1e-2;
-    // Whether to always use the general solver, or a hybrid (planar + genera)
-    // otherwise.
+    // Whether to always use the general solver, or a hybrid (planar + general)
+    // otherwise. When set to true, the general solver is the default one.
+    // Otherwise, the hybrid version (planar + general solvers) kicks in.
     bool use_general_solver = false;
   };
 
@@ -47,7 +64,10 @@ class Gp4pc {
   };
 
   // This structure encodes all the similarity transformations that gp4pc
-  // computes. The structure include the rotations, translations, and scales.
+  // computes. The structure include the rotations, translations, scales,
+  // and depths. The solution thus satisfies
+  //
+  //   camera_center + depth * ray = scale * rotation * point + translation.
   struct Solution {
     std::vector<Eigen::Quaterniond> rotations;
     std::vector<Eigen::Vector3d> translations;

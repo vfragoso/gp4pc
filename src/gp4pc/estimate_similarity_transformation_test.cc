@@ -364,7 +364,7 @@ TEST_F(EstimateSimilarityTransformationTest,
 TEST_F(EstimateSimilarityTransformationTest, AllInliersWithNoise) {
   TestParameters test_params;
   test_params.num_points = kNumPoints;
-  test_params.noise_std_dev = 1e-4;
+  test_params.noise_std_dev = 1e-3;
   test_params.rotation_thresh = DegToRad(5.0);
   test_params.translation_thresh = 1.0;
   test_params.scale_thresh = 0.5;
@@ -386,7 +386,7 @@ TEST_F(EstimateSimilarityTransformationTest,
        InliersAndOutliersWithNoise) {
   TestParameters test_params;
   test_params.num_points = kNumPoints;
-  test_params.noise_std_dev = 1e-4;
+  test_params.noise_std_dev = 1e-3;
   test_params.rotation_thresh = DegToRad(5.0);
   test_params.translation_thresh = 1.0;
   test_params.scale_thresh = 0.5;

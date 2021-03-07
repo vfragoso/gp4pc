@@ -73,7 +73,7 @@ set(GP4PC_INCLUDE_DIRS
   ${GLOG_INCLUDE_DIRS}
   ${GFLAGS_INCLUDE_DIR})
 
-# Defining variable for gDLS* library dependencies.
+# Defining variable for gp4pc library dependencies.
 set(GP4PC_LIBRARY_DEPS ${LIBM} ${GLOG_LIBRARY} gflags)
 
 # Find gtest for building unit tests.

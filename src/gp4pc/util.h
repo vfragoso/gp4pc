@@ -18,7 +18,7 @@
 
 namespace msft {
 
-// Computes the gDLS* input from the 2D-3D correspondences and its respective
+// Computes the gp4pc input from the 2D-3D correspondences and its respective
 // camera observing the 3D point.
 Gp4pc::Input ComputeInputDatum(
     const std::vector<CameraFeatureCorrespondence2D3D>& correspondences);
