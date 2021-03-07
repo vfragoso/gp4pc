@@ -18,9 +18,10 @@
 
 namespace msft {
 
-// TODO(vfragoso): Document class!
+// TODO(vfragoso): Document class! NOTE: Solution obbeys the Umeyama's
+// similarity transformation application.
 class Gp4pc {
-public:
+ public:
   // TODO(vfragoso): Document me!
   struct Params {
     // Coplanar threshold.

@@ -83,11 +83,10 @@ double Gp4pcRobustEstimator::UpdateBestSolution(
     VLOG(3) << "Scale: " << scale;
     for (int j = 0; j < correspondences.size(); ++j) {
       // Compute point coordinates wrt generalized coordinate frame:
-      //   scale * cam_position + depth * ray = rotation * point + translation
-      //   cam_position + d' * ray = (rotation * point + translation) / scale,
-      // where d' is = depth / scale.
+      //   cam_position + depth * ray = scale * rotation * point + translation
+      //   depth * ray = scale * rotation * point + translation - cam_position.
       const Eigen::Vector3d point_in_gen_camera =
-          (rotation * correspondences[j].point + translation) / scale;
+          scale * (rotation * correspondences[j].point) + translation;
       // Project point in camera.
       const PinholeCamera& camera = correspondences[j].camera;
       if (camera.ProjectPoint(point_in_gen_camera, &pixel) < 0) {

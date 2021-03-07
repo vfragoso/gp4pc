@@ -16,6 +16,8 @@
 #include <gp4pc/gp4pc.h>
 #include <math/solve_gp4pc_polynomial.h>
 #include <third_party/align_point_clouds.h>
+#include <algorithm>
+#include <utility>
 #include <vector>
 
 namespace msft {
@@ -150,7 +152,7 @@ Eigen::Vector2d Findt1t3(const Eigen::Vector3d& x1,
   const Eigen::Vector3d b = x3 - x1;
 
   // A = [v1 -v2 v3]; (MATLAB code).
-  Eigen::MatrixXd A(3,3);
+  Eigen::MatrixXd A(3, 3);
   A.col(0) = v1;
   A.col(1) = -v2;
   A.col(2) = v3;
@@ -164,19 +166,28 @@ Eigen::Vector2d Findt1t3(const Eigen::Vector3d& x1,
 
 // This function calculates (f1, f2, f3, f4) and (K1, K2) from the four points
 // (x1, x2, x3, x4).
-// TODO(vfragoso): Pass world points instead of x_i and create a structure
-// for f_i and k_j.
-void CalculateRatiosFromFourPoints(const Eigen::Vector3d& x1,
-                                   const Eigen::Vector3d& x2,
-                                   const Eigen::Vector3d& x3,
-                                   const Eigen::Vector3d& x4,
-                                   double& f1,
-                                   double& f2,
-                                   double& f3,
-                                   double& f4,
-                                   double& K1,
-                                   double& K2) {
-  //
+struct DerivedConstants {
+  double f1;
+  double f2;
+  double f3;
+  double f4;
+  double k1;
+  double k2;
+};
+
+DerivedConstants CalculateRatiosFromFourPoints(
+    const Eigen::Vector3d& x1,
+    const Eigen::Vector3d& x2,
+    const Eigen::Vector3d& x3,
+    const Eigen::Vector3d& x4) {
+  DerivedConstants constants;
+  double& f1 = constants.f1;
+  double& f2 = constants.f2;
+  double& f3 = constants.f3;
+  double& f4 = constants.f4;
+  double& K1 = constants.k1;
+  double& K2 = constants.k2;
+
   // x1--x2 is the first line segment and x3--x4 is the second line segment.
   // z1 is on x1--x2, z3 is on x3--x4 and (z1--z3) is also perpendicular
   // to x1--x2 and x3--x4
@@ -185,7 +196,6 @@ void CalculateRatiosFromFourPoints(const Eigen::Vector3d& x1,
   // t2 is equal to dist(x3,z3) / dist(x3,x4)
   //
   // [t1, t3, x1, x2, x3, x4] = findClosestPoints(X,1,2,3,4); (MATLAB code)
-  //
 
   const Eigen::Vector2d t_vec = Findt1t3(x1, x2, x3, x4);
 
@@ -204,9 +214,10 @@ void CalculateRatiosFromFourPoints(const Eigen::Vector3d& x1,
   f2 = t_vec(0);
   f3 = 1 - t_vec(1);
   f4 = t_vec(1);
+
+  return constants;
 }
 
-// TODO(vfragoso): Polish this function.
 Eigen::MatrixXd SolveForDepthsFromAPlanarInput(const Gp4pc::Input& input) {
   // Useful aliases.
   // Camera centers.
@@ -246,86 +257,97 @@ Eigen::MatrixXd SolveForDepthsFromAPlanarInput(const Gp4pc::Input& input) {
   const Eigen::Vector3d& x4 = world_points[3];
 
   // Derived Constants.
-  double f1, f2, f3, f4, K1, K2;
-  CalculateRatiosFromFourPoints(x1, x2, x3, x4, f1, f2, f3, f4, K1, K2);
+  const DerivedConstants constants =
+      CalculateRatiosFromFourPoints(x1, x2, x3, x4);
 
   // Derived Constants.
-  const Eigen::Vector3d p5 = f1 * p1 + f2 * p2 - f3 * p3 - f4 * p4;
+  const Eigen::Vector3d p5 =
+      constants.f1 * p1 + constants.f2 * p2 -
+      constants.f3 * p3 - constants.f4 * p4;
   const Eigen::Vector3d p6 = p1 - p2;
   const Eigen::Vector3d p8 = p1 - p3;
 
   // Derived Constants.
-  const Eigen::Vector3d v1 = f1 * u1;
-  const Eigen::Vector3d v2 = f2 * u2;
-  const Eigen::Vector3d v3 = -f3 * u3;
-  const Eigen::Vector3d v4 = -f4 * u4;
+  const Eigen::Vector3d v1 = constants.f1 * u1;
+  const Eigen::Vector3d v2 = constants.f2 * u2;
+  const Eigen::Vector3d v3 = -constants.f3 * u3;
+  const Eigen::Vector3d v4 = -constants.f4 * u4;
 
   // Think of the 3 x 3 system in s1, s2, s3
-  // [a1 b1 c1]   [d1]
+  // [a1 b1 c1] = [d1]
   // [a2 b2 c2] = [d2]
-  // [a3 b3 c3] = [d3]
-  double a1 = v1(0);
-  double b1 = v2(0);
-  double c1 = v3(0);
-  double a2 = v1(1);
-  double b2 = v2(1);
-  double c2 = v3(1);
-  double a3 = v1(2);
-  double b3 = v2(2);
-  double c3 = v3(2);
+  // [a3 b3 c3] = [d3].
+  const double& a1 = v1(0);
+  const double& b1 = v2(0);
+  const double& c1 = v3(0);
+  const double& a2 = v1(1);
+  const double& b2 = v2(1);
+  const double& c2 = v3(1);
+  const double& a3 = v1(2);
+  const double& b3 = v2(2);
+  const double& c3 = v3(2);
 
-  double denom = a1 * b2 * c3 + b1 * c2 * a3 + c1 * a2 * b3 - a3 * b2 * c1 -
-                 b3 * c2 * a1 - c3 * a2 * b1;
+  const double denom =
+      a1 * b2 * c3 + b1 * c2 * a3 + c1 * a2 * b3 -
+      a3 * b2 * c1 - b3 * c2 * a1 - c3 * a2 * b1;
 
-  double Coef11 = b2 * c3 - b3 * c2;
-  double Coef12 = c1 * b3 - c3 * b1;
-  double Coef13 = b1 * c2 - b2 * c1;
+  const double coeff11 = b2 * c3 - b3 * c2;
+  const double coeff12 = c1 * b3 - c3 * b1;
+  const double coeff13 = b1 * c2 - b2 * c1;
 
-  double G1 = (-v4(0) * Coef11 - v4(1) * Coef12 - v4(2) * Coef13) / denom;
-  double H1 = (-p5(0) * Coef11 - p5(1) * Coef12 - p5(2) * Coef13) / denom;
+  const double G1 =
+      (-v4(0) * coeff11 - v4(1) * coeff12 - v4(2) * coeff13) / denom;
+  const double H1 =
+      (-p5(0) * coeff11 - p5(1) * coeff12 - p5(2) * coeff13) / denom;
 
-  double Coef21 = c2 * a3 - c3 * a2;
-  double Coef22 = a1 * c3 - a3 * c1;
-  double Coef23 = c1 * a2 - c2 * a1;
+  const double coeff21 = c2 * a3 - c3 * a2;
+  const double coeff22 = a1 * c3 - a3 * c1;
+  const double coeff23 = c1 * a2 - c2 * a1;
 
-  double G2 = (-v4(0) * Coef21 - v4(1) * Coef22 - v4(2) * Coef23) / denom;
-  double H2 = (-p5(0) * Coef21 - p5(1) * Coef22 - p5(2) * Coef23) / denom;
+  const double G2 =
+      (-v4(0) * coeff21 - v4(1) * coeff22 - v4(2) * coeff23) / denom;
+  const double H2 =
+      (-p5(0) * coeff21 - p5(1) * coeff22 - p5(2) * coeff23) / denom;
 
-  double Coef31 = b3 * a2 - b2 * a3;
-  double Coef32 = a3 * b1 - a1 * b3;
-  double Coef33 = b2 * a1 - b1 * a2;
+  const double coeff31 = b3 * a2 - b2 * a3;
+  const double coeff32 = a3 * b1 - a1 * b3;
+  const double coeff33 = b2 * a1 - b1 * a2;
 
-  double G3 = (-v4(0) * Coef31 - v4(1) * Coef32 - v4(2) * Coef33) / denom;
-  double H3 = (-p5(0) * Coef31 - p5(1) * Coef32 - p5(2) * Coef33) / denom;
+  const double G3 =
+      (-v4(0) * coeff31 - v4(1) * coeff32 - v4(2) * coeff33) / denom;
+  const double H3 =
+      (-p5(0) * coeff31 - p5(1) * coeff32 - p5(2) * coeff33) / denom;
 
-  double C1 = 1 - K2;
-  double C2 = 1;
-  double C3 = -K2;
-  double C4 = -2.0 * u1.dot(u2);
-  double C5 = 2.0 * K2 * u1.dot(u3);
-  double C6 = 2.0 * (u1.dot(p6) - K2 * u1.dot(p8));
-  double C7 = -2.0 * u2.dot(p6);
-  double C8 = 2.0 * K2 * u3.dot(p8);
-  double C9 = p6.dot(p6) - K2 * p8.dot(p8);
+  const double C1 = 1 - constants.k2;
+  const double C2 = 1;
+  const double C3 = -constants.k2;
+  const double C4 = -2.0 * u1.dot(u2);
+  const double C5 = 2.0 * constants.k2 * u1.dot(u3);
+  const double C6 = 2.0 * (u1.dot(p6) - constants.k2 * u1.dot(p8));
+  const double C7 = -2.0 * u2.dot(p6);
+  const double C8 = 2.0 * constants.k2 * u3.dot(p8);
+  const double C9 = p6.dot(p6) - constants.k2 * p8.dot(p8);
 
-  // Derive the coefficients of the quadratic
-  double A =
+  // Derive the coefficients of the quadratic.
+  const double A =
       C1 * G1 * G1 + C2 * G2 * G2 + C3 * G3 * G3 + C4 * G1 * G2 + C5 * G1 * G3;
-  double B = C1 * 2 * G1 * H1 + C2 * 2 * G2 * H2 + C3 * 2 * G3 * H3 +
-             C4 * (G1 * H2 + G2 * H1) + C5 * (G1 * H3 + G3 * H1) + C6 * G1 +
-             C7 * G2 + C8 * G3;
-  double C = C1 * H1 * H1 + C2 * H2 * H2 + C3 * H3 * H3 + C4 * H1 * H2 +
-             C5 * H1 * H3 + C6 * H1 + C7 * H2 + C8 * H3 + C9;
-  double Disc = (B * B - 4 * A * C);
+  const double B =
+      C1 * 2 * G1 * H1 + C2 * 2 * G2 * H2 + C3 * 2 * G3 * H3 +
+      C4 * (G1 * H2 + G2 * H1) + C5 * (G1 * H3 + G3 * H1) + C6 * G1 +
+      C7 * G2 + C8 * G3;
+  const double C =
+      C1 * H1 * H1 + C2 * H2 * H2 + C3 * H3 * H3 + C4 * H1 * H2 +
+      C5 * H1 * H3 + C6 * H1 + C7 * H2 + C8 * H3 + C9;
+  const double disc = (B * B - 4 * A * C);
 
   Eigen::MatrixXd depths;
   depths.resize(4, 2);
   depths.setZero();
 
-  if (Disc >= 0) {
-    double sqrtD = sqrt(Disc);
-    double s4a = (-B - sqrtD) / (2 * A);
-    double s4b = (-B + sqrtD) / (2 * A);
+  if (disc >= 0) {
+    const double sqrtD = sqrt(disc);
+    const double s4a = (-B - sqrtD) / (2 * A);
+    const double s4b = (-B + sqrtD) / (2 * A);
 
     if (s4a > 0) {
       depths(0, 0) = G1 * s4a + H1;
@@ -387,57 +409,59 @@ Eigen::MatrixXd BuildCoefficientMatrix(const Gp4pc::Input& input) {
   const Eigen::Vector3d& x4 = world_points[3];
 
   // Derived Constants
-  double f1, f2, f3, f4, K1, K2;
-  CalculateRatiosFromFourPoints(x1, x2, x3, x4, f1, f2, f3, f4, K1, K2);
+  const DerivedConstants constants =
+      CalculateRatiosFromFourPoints(x1, x2, x3, x4);
 
   // Derived Constants
-  const Eigen::Vector3d p5  = f1 * p1 + f2 * p2 - f3 * p3 - f4 * p4;
-  const Eigen::Vector3d p6  = p1 - p2;
-  const Eigen::Vector3d p7  = p3 - p4;
-  const Eigen::Vector3d p8  = p1 - p3;
-  const Eigen::Vector3d p9  = p2 - p4;
+  const Eigen::Vector3d p5  =
+      constants.f1 * p1 + constants.f2 * p2 -
+      constants.f3 * p3 - constants.f4 * p4;
+  const Eigen::Vector3d p6 = p1 - p2;
+  const Eigen::Vector3d p7 = p3 - p4;
+  const Eigen::Vector3d p8 = p1 - p3;
+  const Eigen::Vector3d p9 = p2 - p4;
   const Eigen::Vector3d p10 = p1 - p4;
   const Eigen::Vector3d p11 = p2 - p3;
 
   // Derived Constants
-  const Eigen::Vector3d v1 =  f1 * u1;
-  const Eigen::Vector3d v2 =  f2 * u2;
-  const Eigen::Vector3d v3 = -f3 * u3;
-  const Eigen::Vector3d v4 = -f4 * u4;
+  const Eigen::Vector3d v1 = constants.f1 * u1;
+  const Eigen::Vector3d v2 = constants.f2 * u2;
+  const Eigen::Vector3d v3 = -constants.f3 * u3;
+  const Eigen::Vector3d v4 = -constants.f4 * u4;
 
   // Equation derived from orthogonality constraint 1.
-  coeff_mat(0, 0)  =  v1.dot(u1);
-  coeff_mat(0, 1)  = -u2.dot(v2);
-  coeff_mat(0, 2)  =  0;
-  coeff_mat(0, 3)  =  0;
-  coeff_mat(0, 4)  =  u1.dot(v2) - u2.dot(v1);
-  coeff_mat(0, 5)  =  u1.dot(v3);
-  coeff_mat(0, 6)  =  u1.dot(v4);
-  coeff_mat(0, 7)  = -u2.dot(v3);
-  coeff_mat(0, 8)  = -u2.dot(v4);
-  coeff_mat(0, 9)  =  0;
-  coeff_mat(0,10)  =  p6.dot(v1) + u1.dot(p5);
-  coeff_mat(0,11)  =  p6.dot(v2) - u2.dot(p5);
-  coeff_mat(0,12)  =  p6.dot(v3);
-  coeff_mat(0,13)  =  p6.dot(v4);
-  coeff_mat(0,14)  =  p6.dot(p5);
+  coeff_mat(0, 0) = v1.dot(u1);
+  coeff_mat(0, 1) = -u2.dot(v2);
+  coeff_mat(0, 2) = 0;
+  coeff_mat(0, 3) = 0;
+  coeff_mat(0, 4) = u1.dot(v2) - u2.dot(v1);
+  coeff_mat(0, 5) = u1.dot(v3);
+  coeff_mat(0, 6) = u1.dot(v4);
+  coeff_mat(0, 7) = -u2.dot(v3);
+  coeff_mat(0, 8) = -u2.dot(v4);
+  coeff_mat(0, 9) = 0;
+  coeff_mat(0, 10) = p6.dot(v1) + u1.dot(p5);
+  coeff_mat(0, 11) = p6.dot(v2) - u2.dot(p5);
+  coeff_mat(0, 12) = p6.dot(v3);
+  coeff_mat(0, 13) = p6.dot(v4);
+  coeff_mat(0, 14) = p6.dot(p5);
 
   // Equation derived from orthogonality constraint 2.
-  coeff_mat(1,0)  =  0;
-  coeff_mat(1,1)  =  0;
-  coeff_mat(1,2)  =  u3.dot(v3);
-  coeff_mat(1,3)  = -u4.dot(v4);
-  coeff_mat(1,4)  =  0;
-  coeff_mat(1,5)  =  u3.dot(v1);
-  coeff_mat(1,6)  = -u4.dot(v1);
-  coeff_mat(1,7)  =  u3.dot(v2);
-  coeff_mat(1,8)  = -u4.dot(v2);
-  coeff_mat(1,9) =  u3.dot(v4) - u4.dot(v3);
-  coeff_mat(1,10) =  p7.dot(v1);
-  coeff_mat(1,11) =  p7.dot(v2);
-  coeff_mat(1,12) =  p7.dot(v3) + u3.dot(p5);
-  coeff_mat(1,13) =  p7.dot(v4) - u4.dot(p5);
-  coeff_mat(1,14) =  p7.dot(p5);
+  coeff_mat(1, 0) =  0;
+  coeff_mat(1, 1) =  0;
+  coeff_mat(1, 2) =  u3.dot(v3);
+  coeff_mat(1, 3) = -u4.dot(v4);
+  coeff_mat(1, 4) =  0;
+  coeff_mat(1, 5) =  u3.dot(v1);
+  coeff_mat(1, 6) = -u4.dot(v1);
+  coeff_mat(1, 7) =  u3.dot(v2);
+  coeff_mat(1, 8) = -u4.dot(v2);
+  coeff_mat(1, 9) =  u3.dot(v4) - u4.dot(v3);
+  coeff_mat(1, 10) =  p7.dot(v1);
+  coeff_mat(1, 11) =  p7.dot(v2);
+  coeff_mat(1, 12) =  p7.dot(v3) + u3.dot(p5);
+  coeff_mat(1, 13) =  p7.dot(v4) - u4.dot(p5);
+  coeff_mat(1, 14) =  p7.dot(p5);
 
   // Coefficients of quadratic polynomial that corresponds to the squared
   // length for edges 1--2, 1--3 and 3--4.
@@ -448,30 +472,30 @@ Eigen::MatrixXd BuildCoefficientMatrix(const Gp4pc::Input& input) {
   d13.setZero();
   d34.setZero();
 
-  d12(0)  =  1;
-  d12(1)  =  1;
-  d12(4)  = -2.0 * u1.dot(u2);
-  d12(10) =  2.0 * u1.dot(p6);
+  d12(0) = 1;
+  d12(1) = 1;
+  d12(4) = -2.0 * u1.dot(u2);
+  d12(10) = 2.0 * u1.dot(p6);
   d12(11) = -2.0 * u2.dot(p6);
-  d12(14) =  p6.dot(p6);
+  d12(14) = p6.dot(p6);
 
-  d13(0)  =  1;
-  d13(2)  =  1;
-  d13(5)  = -2.0 * u1.dot(u3);
-  d13(10) =  2.0 * u1.dot(p8);
+  d13(0) = 1;
+  d13(2) = 1;
+  d13(5) = -2.0 * u1.dot(u3);
+  d13(10) = 2.0 * u1.dot(p8);
   d13(12) = -2.0 * u3.dot(p8);
-  d13(14) =  p8.dot(p8);
+  d13(14) = p8.dot(p8);
 
-  d34(2)  =  1;
-  d34(3)  =  1;
-  d34(9)  = -2.0 * u3.dot(u4);
-  d34(12) =  2.0 * u3.dot(p7);
+  d34(2) = 1;
+  d34(3) = 1;
+  d34(9) = -2.0 * u3.dot(u4);
+  d34(12) = 2.0 * u3.dot(p7);
   d34(13) = -2.0 * u4.dot(p7);
-  d34(14) =  p7.dot(p7);
+  d34(14) = p7.dot(p7);
 
   // Two equations derived from distance ratio constraints.
-  coeff_mat.row(2) = d12 - K1 * d34;
-  coeff_mat.row(3) = d12 - K2 * d13;
+  coeff_mat.row(2) = d12 - constants.k1 * d34;
+  coeff_mat.row(3) = d12 - constants.k2 * d13;
 
   return coeff_mat;
 }

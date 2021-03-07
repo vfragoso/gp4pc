@@ -112,8 +112,8 @@ bool CheckReprojectionErrors(const Input& input,
 
     const Vector3d unrot_cam_ray = unrot * camera_rays[i];
     const Vector3d unrot_reproj_pt = unrot * reprojected_point;
-    
-    const double reprojection_error = 
+
+    const double reprojection_error =
         (unrot_cam_ray.hnormalized() - unrot_reproj_pt.hnormalized()).norm();
     good_reprojection_errors = (good_reprojection_errors &&
                                 (reprojection_error < max_reprojection_error));
@@ -408,7 +408,7 @@ TEST_F(Gp4pcTest, BailOutOnSingleCameraCenter) {
     Eigen::Vector3d(-0.334288, 00.265068, 00.904428),
     Eigen::Vector3d(0-0.37081, -0.479971, 00.795065),
     Eigen::Vector3d(-0.14836, 0.236824, 0.960158),
-    Eigen::Vector3d(-0.26705, 0.138519, 0.953675)    
+    Eigen::Vector3d(-0.26705, 0.138519, 0.953675)
   };
 
   input.ray_origins = {

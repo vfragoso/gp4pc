@@ -22,8 +22,10 @@ namespace msft {
 // Computes the similarity transformation given the 2D-3D correspondences.
 Gp4pc::Solution EstimateSimilarityTransformation(
     const std::vector<CameraFeatureCorrespondence2D3D>& correspondences) {
-  // TODO(vfragoso): Implement me!.
   Gp4pc::Solution solution;
+  const Gp4pc::Input input = ComputeInputDatum(correspondences);
+  Gp4pc estimator;
+  estimator.EstimateSimilarityTransformation(input, &solution);  
   return solution;
 }
 
@@ -33,8 +35,9 @@ Gp4pc::Solution EstimateSimilarityTransformation(
     const Gp4pcRobustEstimator::RansacParameters& params,
     const std::vector<CameraFeatureCorrespondence2D3D>& correspondences,
     Gp4pcRobustEstimator::RansacSummary* ransac_summary) {
-  // TODO(vfragoso): Implement me!.
-  Gp4pc::Solution solution;
+  Gp4pcRobustEstimator estimator(params);
+  const Gp4pc::Solution solution =
+      estimator.Estimate(correspondences, ransac_summary);
   return solution;
 }
 

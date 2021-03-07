@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 //
-// gDLS*: Generalized Pose-and-Scale Estimation Given Scale and Gravity Priors
+// Generalized Pose-and-Scale Estimation using 4-Point Congruence Constraints
 //
-// Victor Fragoso, Joseph DeGol, Gang Hua.
-// Proc. of the IEEE/CVF Conf. on Computer Vision and Pattern Recognition 2020.
+// Victor Fragoso and Sudipta Sinha.
+// In Proc. of the IEEE International Conf. on 3D Vision (3DV) 2020.
 //
 // Please contact the author of this library if you have any questions.
 // Author: Victor Fragoso (victor.fragoso@microsoft.com)
@@ -20,6 +20,8 @@
 #include <gp4pc/estimate_similarity_transformation.h>
 #include <gp4pc/pinhole_camera.h>
 #include <math/utils.h>
+#include <utility>
+#include <vector>
 
 namespace msft {
 namespace {
@@ -38,6 +40,8 @@ static const double kMinAngleDeg = 5.0;
 static const double kMaxAngleDeg = 40.0;
 // Max. num of trials.
 static const int kNumTrials = 8;
+// Expected success rate.
+static const double kSuccessRate = 0.8;
 // Minimum and maximum limits for generating 3D points.
 static const double kMinXY = -5.0;
 static const double kMaxXY = 5.0;
@@ -182,6 +186,9 @@ class EstimateSimilarityTransformationTest : public ::testing::Test {
     for (int i = 0; i < test_params.num_points; ++i) {
       CameraFeatureCorrespondence2D3D& correspondence = correspondences[i];
       correspondence.camera = cameras[i % cameras.size()];
+
+      // Set up random 3D point and reproject it onto the image. Make sure the
+      // point is in front of the camera.
       double depth = -1;
       do {
         // Create a random 3D point that is in front of the camera.
@@ -206,12 +213,14 @@ class EstimateSimilarityTransformationTest : public ::testing::Test {
             kFocalLength * Eigen::Vector2d::Random();
       }
 
-      // Apply inv. transformation.
+      const Eigen::Vector3d old_point = correspondences[i].point;
+      // Since the 3d point is in front of the camera, we need to calculate the
+      // final 3d point to estimate the rigid transformation.
       const Eigen::Vector3d new_point =
           expected_transformation.rotation.conjugate() *
-          (expected_transformation.scale * correspondences[i].point -
-           expected_transformation.translation);
-      correspondences[i].point = std::move(new_point);
+          (old_point - expected_transformation.translation) /
+          expected_transformation.scale;
+      correspondences[i].point = new_point;
     }
 
     return correspondences;
@@ -255,7 +264,7 @@ class EstimateSimilarityTransformationTest : public ::testing::Test {
       const bool good_scale = scale_error < test_params.scale_thresh;
       const bool good_run = good_rotation && good_translation && good_scale;
 
-      VLOG_IF(3, !good_run) << "Solution: " << (i + 1) << "/" << num_solutions
+      VLOG_IF(2, !good_run) << "Solution: " << (i + 1) << "/" << num_solutions
                             << "\nRotation error: " << rotation_error
                             << " thresh: " << test_params.rotation_thresh
                             << " good: " << good_rotation
@@ -274,7 +283,7 @@ class EstimateSimilarityTransformationTest : public ::testing::Test {
     return num_trials_passed > 0;
   }
 
-  void ExecuteRandomTest(
+  bool ExecuteRandomTest(
       const TestParameters& test_params,
       const SimilarityTransformation& expected_transformation) {
     // Compute 2D-3D correspondences.
@@ -286,13 +295,11 @@ class EstimateSimilarityTransformationTest : public ::testing::Test {
         EstimateSimilarityTransformation(correspondences);
 
     // Evaluate solution.
-    EXPECT_TRUE(EvaluateSolution(test_params,
-                                 expected_transformation,
-                                 solution));
+    return EvaluateSolution(test_params, expected_transformation, solution);
   }
 
 
-  void ExecuteRansacRandomTest(
+  bool ExecuteRansacRandomTest(
       const TestParameters& test_params,
       const SimilarityTransformation& expected_transformation) {
     // Compute 2D-3D correspondences.
@@ -307,9 +314,7 @@ class EstimateSimilarityTransformationTest : public ::testing::Test {
                                          &ransac_summary);
 
     // Evaluate solution.
-    EXPECT_TRUE(EvaluateSolution(test_params,
-                                 expected_transformation,
-                                 solution));
+    return EvaluateSolution(test_params, expected_transformation, solution);
   }
 
   // Random number generator.
@@ -322,11 +327,17 @@ std::mt19937* EstimateSimilarityTransformationTest::rng = nullptr;
 TEST_F(EstimateSimilarityTransformationTest,
        MinimalBasicEstimationNoNoise) {
   TestParameters test_params;
+  int num_successful_runs = 0;
   for (int i = 0; i < kNumTrials; ++i) {
     const SimilarityTransformation expected_transformation =
         GenerateRandomSimilarityTransformation(test_params);
-    ExecuteRandomTest(test_params, expected_transformation);
+    if (ExecuteRandomTest(test_params, expected_transformation)) {
+      ++num_successful_runs;
+    }
   }
+  const double success_rate =
+      static_cast<double>(num_successful_runs) / kNumTrials;
+  EXPECT_TRUE(success_rate > kSuccessRate) << "Success rate: " << success_rate;
 }
 
 TEST_F(EstimateSimilarityTransformationTest,
@@ -336,53 +347,38 @@ TEST_F(EstimateSimilarityTransformationTest,
   test_params.rotation_thresh = DegToRad(5.0);
   test_params.translation_thresh = 1.0;
   test_params.scale_thresh = 0.5;
+  int num_successful_runs = 0;
   for (int i = 0; i < kNumTrials; ++i) {
     const SimilarityTransformation expected_transformation =
         GenerateRandomSimilarityTransformation(test_params);
-    ExecuteRandomTest(test_params, expected_transformation);
+    if (ExecuteRandomTest(test_params, expected_transformation)) {
+      ++num_successful_runs;
+    }
   }
-}
-
-// Non-minimal estimation tests.
-TEST_F(EstimateSimilarityTransformationTest,
-       NonMinimalBasicEstimationNoNoise) {
-  TestParameters test_params;
-  test_params.num_points = kNumPoints;
-  for (int i = 0; i < kNumTrials; ++i) {
-    const SimilarityTransformation expected_transformation =
-        GenerateRandomSimilarityTransformation(test_params);
-    ExecuteRandomTest(test_params, expected_transformation);
-  }
-}
-
-TEST_F(EstimateSimilarityTransformationTest,
-       NonMinimalBasicEstimationWithNoise) {
-  TestParameters test_params;
-  test_params.num_points = kNumPoints;
-  test_params.noise_std_dev = 1e-3;
-  test_params.rotation_thresh = DegToRad(5.0);
-  test_params.translation_thresh = 1.0;
-  test_params.scale_thresh = 0.5;
-  for (int i = 0; i < kNumTrials; ++i) {
-    const SimilarityTransformation expected_transformation =
-        GenerateRandomSimilarityTransformation(test_params);
-    ExecuteRandomTest(test_params, expected_transformation);
-  }
+  const double success_rate =
+      static_cast<double>(num_successful_runs) / kNumTrials;
+  EXPECT_TRUE(success_rate > kSuccessRate) << "Success rate: " << success_rate;
 }
 
 // Test RANSAC estimators all inliers.
 TEST_F(EstimateSimilarityTransformationTest, AllInliersWithNoise) {
   TestParameters test_params;
   test_params.num_points = kNumPoints;
-  test_params.noise_std_dev = 1e-3;
+  test_params.noise_std_dev = 1e-4;
   test_params.rotation_thresh = DegToRad(5.0);
   test_params.translation_thresh = 1.0;
   test_params.scale_thresh = 0.5;
+  int num_successful_runs = 0;
   for (int i = 0; i < kNumTrials; ++i) {
     const SimilarityTransformation expected_transformation =
         GenerateRandomSimilarityTransformation(test_params);
-    ExecuteRansacRandomTest(test_params, expected_transformation);
+    if (ExecuteRansacRandomTest(test_params, expected_transformation)) {
+      ++num_successful_runs;
+    }
   }
+  const double success_rate =
+      static_cast<double>(num_successful_runs) / kNumTrials;
+  EXPECT_TRUE(success_rate > kSuccessRate) << "Success rate: " << success_rate;
 }
 
 // RANSAC w/ inliers and outliers and noise.
@@ -390,16 +386,22 @@ TEST_F(EstimateSimilarityTransformationTest,
        InliersAndOutliersWithNoise) {
   TestParameters test_params;
   test_params.num_points = kNumPoints;
-  test_params.noise_std_dev = 1e-3;
+  test_params.noise_std_dev = 1e-4;
   test_params.rotation_thresh = DegToRad(5.0);
   test_params.translation_thresh = 1.0;
   test_params.scale_thresh = 0.5;
   test_params.inlier_ratio = 0.8;
+  int num_successful_runs = 0;  
   for (int i = 0; i < kNumTrials; ++i) {
     const SimilarityTransformation expected_transformation =
         GenerateRandomSimilarityTransformation(test_params);
-    ExecuteRansacRandomTest(test_params, expected_transformation);
+    if (ExecuteRansacRandomTest(test_params, expected_transformation)) {
+      ++num_successful_runs;
+    }
   }
+  const double success_rate =
+      static_cast<double>(num_successful_runs) / kNumTrials;
+  EXPECT_TRUE(success_rate > kSuccessRate) << "Success rate: " << success_rate;
 }
 
 }  // namespace
